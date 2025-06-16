@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone,Default)]
 pub enum Kind {
     LeftBrace,
     RightBrace,
@@ -42,11 +42,12 @@ pub enum Kind {
     Super,
     This,
 
+    #[default]
     Eof,
     Error,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,Default)]
 pub struct Token {
     pub kind: Kind,
     pub line: usize,

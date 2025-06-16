@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, mem::offset_of, usize, vec};
+use std::{cell::RefCell, collections::VecDeque, mem::offset_of, rc::Rc, usize, vec};
 
 use crate::{
     chunk::{Chunk, OpCode},
@@ -6,10 +6,11 @@ use crate::{
     value::Value,
 };
 
-pub struct VM<'a> {
-    chunk: Option<&'a mut Chunk>,
+pub struct VM {
+    chunk: Option<Rc<RefCell<Chunk>>>,
     pub ip: usize,
     pub stack: VecDeque<Value>,
+    compiler:Compiler
 }
 pub enum InterpretResult {
     INTERPRET_OK,
@@ -18,20 +19,22 @@ pub enum InterpretResult {
 }
 
 #[allow(non_camel_case_types, non_snake_case)]
-impl<'a> VM<'a> {
-    pub fn new() -> Self {
+impl VM {
+    pub fn new(source: String) -> Self {
         Self {
             chunk: None,
             ip: 0,
             stack: VecDeque::with_capacity(256),
+            compiler:Compiler::new(source)
         }
     }
 
-    pub fn interpret(&mut self, source: String, chunk: &'a mut Chunk) -> InterpretResult {
-        if !Compiler::compile(source, chunk) {
+    pub fn interpret(&mut self,chunk: Rc<RefCell<Chunk>>) -> InterpretResult {
+
+        if  !self.compiler.compile(chunk.clone()){
             return InterpretResult::INTERPRET_COMPILE_ERROR;
         }
-        self.chunk = Some(chunk);
+        self.chunk = Some(chunk.clone());
         self.run().unwrap()
     }
 
@@ -40,8 +43,9 @@ impl<'a> VM<'a> {
             print!("          ");
             println!(" stack {:?}", self.stack);
             self.chunk
-                .as_deref_mut()
+                .as_ref()
                 .unwrap()
+                .borrow_mut()
                 .disassembleInstruction(self.ip);
             let instruction = self.read_byte();
             match OpCode::try_from(instruction).unwrap() {
@@ -84,13 +88,13 @@ impl<'a> VM<'a> {
     }
 
     pub fn read_byte(&mut self) -> u8 {
-        let byte = self.chunk.as_deref_mut().unwrap().code[self.ip];
+        let byte = self.chunk.as_ref().unwrap().borrow_mut().code[self.ip];
         self.ip += 1;
         byte
     }
 
     pub fn read_constant(&mut self) -> Value {
         let byte = self.read_byte();
-        self.chunk.as_deref().unwrap().constants.values[byte as usize]
+        self.chunk.as_ref().unwrap().borrow_mut().constants.values[byte as usize]
     }
 }
