@@ -1,18 +1,31 @@
-
-
 use crate::{chunk, value::{self, Value, ValueArray}};
 
 #[derive(Debug)]
 #[repr(u8)]
 pub enum OpCode{
     Return,
+    OP_NEGATE,
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_MULTIPLY,
+    OP_DIVIDE,
     Op_Constnats,
+}
+
+impl TryFrom<u8> for OpCode{
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        let res = unsafe {
+            std::mem::transmute::<u8,OpCode>(value)
+        };
+        Ok(res)
+    }
 }
 
 #[derive(Debug)]
 pub struct Chunk {
     pub code:Vec<u8>,
-    pub lines:Vec<i32>,
+    pub lines:Vec<usize>,
     pub constants:ValueArray
 }
 
@@ -33,8 +46,9 @@ impl Chunk{
         
     }
 
-    pub fn write_chunk(&mut self,opcode:u8,line:i32){
-        self.code.push(opcode as u8);
+    pub fn write_chunk(&mut self,opcode:u8,line:usize){
+        //println!("OP_code as u8{:?}" , opcode );
+        self.code.push(opcode);
         self.lines.push(line);
     }
 
@@ -43,7 +57,8 @@ impl Chunk{
         self.constants.values.len() -1
     }
 
-    fn disassembleInstruction(&mut self,offset:usize)->usize{
+    pub fn disassembleInstruction(&mut self,offset:usize)->usize{
+       // println!("Code: {:?} Constants : {:?}",self.code,self.constants.values);
         print!("{:04} ",offset);
         if offset > 0 && self.lines[offset] == self.lines[offset -1]{
             print!("   | ")
@@ -52,9 +67,7 @@ impl Chunk{
         }
 
         let instruction = self.code[offset];
-        match unsafe {
-            core::mem::transmute::<u8,OpCode>(instruction)
-        }{
+        match OpCode::try_from(instruction).unwrap(){
             OpCode::Return => {
                 println!("OP_RETURN");
                 offset + 1
@@ -62,9 +75,29 @@ impl Chunk{
             OpCode::Op_Constnats =>{
                 let constant = self.code[offset +1];
                 print!("{:<16} {:>4}","OP_CONSTANT",constant);
-                println!("{}",self.constants.values[constant as usize]);
+                println!("-> {}",self.constants.values[constant as usize]);
                 println!("");
                 offset +2
+            },
+            OpCode::OP_NEGATE =>{
+                println!("OP_NEGATE");
+                offset + 1 
+            },
+            OpCode::OP_MULTIPLY=>{
+                println!("OP_MULTIPLY");
+                offset + 1 
+            },
+            OpCode::OP_SUBTRACT=>{
+                println!("OP_SUBTRACT");
+                offset + 1 
+            },
+            OpCode::OP_DIVIDE=>{
+                println!("OP_DIVIDE");
+                offset + 1 
+            },
+            OpCode::OP_ADD=>{
+                println!("OP_ADD");
+                offset + 1
             }
             _=>todo!()
         }
