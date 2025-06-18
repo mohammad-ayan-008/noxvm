@@ -13,6 +13,13 @@ pub enum OpCode {
     OP_MULTIPLY,
     OP_DIVIDE,
     Op_Constnats,
+    OP_NIL,
+    OP_TRUE,
+    OP_FALSE,
+    OP_NOT,
+    OP_EQUAL,
+    OP_GREATER,
+    OP_LESS,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -76,7 +83,7 @@ impl Chunk {
             OpCode::Op_Constnats => {
                 let constant = self.code[offset + 1];
                 print!("{:<16} {:>4}", "OP_CONSTANT", constant);
-                println!("-> {}", self.constants.values[constant as usize]);
+                self.printValue(&self.constants.values[constant as usize]);
                 println!("");
                 offset + 2
             }
@@ -86,6 +93,18 @@ impl Chunk {
             }
             OpCode::OP_MULTIPLY => {
                 println!("OP_MULTIPLY");
+                offset + 1
+            }
+            OpCode::OP_TRUE => {
+                println!("OP_TRUE");
+                offset + 1
+            }
+            OpCode::OP_FALSE => {
+                println!("OP_FALSE");
+                offset + 1
+            }
+            OpCode::OP_NIL => {
+                println!("OP_NIL");
                 offset + 1
             }
             OpCode::OP_SUBTRACT => {
@@ -100,7 +119,32 @@ impl Chunk {
                 println!("OP_ADD");
                 offset + 1
             }
+            OpCode::OP_NOT => {
+                println!("OP_NOT");
+                offset + 1
+            },
+            OpCode::OP_LESS =>{
+                println!("OP_LESS");
+                offset + 1
+            },
+            OpCode::OP_GREATER =>{
+                println!("OP_GREATER");
+                offset + 1
+            },
+            OpCode::OP_EQUAL =>{
+                println!("OP_EQUAL");
+                offset + 1
+            },
+
             _ => todo!(),
+        }
+    }
+
+    fn printValue(&self, value: &Value) {
+        match value.type_v {
+            value::ValueType::VAL_NIL => println!("nil"),
+            value::ValueType::VAL_BOOL(a) => println!("{}", a),
+            value::ValueType::VAL_NUMBER(a) => println!("{}", a),
         }
     }
 }

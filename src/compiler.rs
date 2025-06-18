@@ -5,6 +5,7 @@ use crate::{
     chunk::{Chunk, OpCode},
     scanner::{self, Scanner},
     token::{Kind, Token},
+    value::Value,
 };
 
 type ParseFn = for<'a> fn(&'a mut Compiler);
@@ -19,49 +20,70 @@ pub struct ParseRule {
 fn rule_for_token(token: &Kind) -> ParseRule {
     use Kind::*;
     match token {
-        LeftParen         => run(Some(Compiler::grouping as ParseFn), None, Presidence::PREC_NONE),
-        RightParen        => run(None, None, Presidence::PREC_NONE),
-        LeftBrace         => run(None, None, Presidence::PREC_NONE),
-        RightBrace        => run(None, None, Presidence::PREC_NONE),
-        Comma             => run(None, None, Presidence::PREC_NONE),
-        Dot               => run(None, None, Presidence::PREC_NONE),
-        Minus             => run(Some(Compiler::unary as ParseFn), Some(Compiler::binary as ParseFn), Presidence::PREC_TERM),
-        Plus              => run(None, Some(Compiler::binary as ParseFn), Presidence::PREC_TERM),
-        Slash             => run(None, Some(Compiler::binary as ParseFn), Presidence::PREC_FACTOR),
-        Star              => run(None, Some(Compiler::binary as ParseFn), Presidence::PREC_FACTOR),
-        Semicolon         => run(None, None, Presidence::PREC_NONE),
+        LeftParen => run(
+            Some(Compiler::grouping as ParseFn),
+            None,
+            Presidence::PREC_NONE,
+        ),
+        RightParen => run(None, None, Presidence::PREC_NONE),
+        LeftBrace => run(None, None, Presidence::PREC_NONE),
+        RightBrace => run(None, None, Presidence::PREC_NONE),
+        Comma => run(None, None, Presidence::PREC_NONE),
+        Dot => run(None, None, Presidence::PREC_NONE),
+        Minus => run(
+            Some(Compiler::unary as ParseFn),
+            Some(Compiler::binary as ParseFn),
+            Presidence::PREC_TERM,
+        ),
+        Plus => run(
+            None,
+            Some(Compiler::binary as ParseFn),
+            Presidence::PREC_TERM,
+        ),
+        Slash => run(
+            None,
+            Some(Compiler::binary as ParseFn),
+            Presidence::PREC_FACTOR,
+        ),
+        Star => run(
+            None,
+            Some(Compiler::binary as ParseFn),
+            Presidence::PREC_FACTOR,
+        ),
+        Semicolon => run(None, None, Presidence::PREC_NONE),
 
-        Bang              => run(None, None, Presidence::PREC_NONE),
-        BangEqual         => run(None, None, Presidence::PREC_NONE),
-        Equal             => run(None, None, Presidence::PREC_NONE),
-        EqualEqual        => run(None, None, Presidence::PREC_NONE),
-        Greater           => run(None, None, Presidence::PREC_NONE),
-        GreaterEqual      => run(None, None, Presidence::PREC_NONE),
-        Less              => run(None, None, Presidence::PREC_NONE),
-        LessEqual         => run(None, None, Presidence::PREC_NONE),
+        Bang => run(Some(Compiler::unary), None, Presidence::PREC_UNARY),
+        BangEqual => run(None, Some(Compiler::binary), Presidence::PREC_EQUALITY),
+        Equal => run(None, None, Presidence::PREC_NONE),
+        EqualEqual => run(None, Some(Compiler::binary), Presidence::PREC_EQUALITY),
+        Greater => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
+        GreaterEqual => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
+        Less => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
+        LessEqual => run(Some(Compiler::binary), None, Presidence::PREC_COMPARISON),
 
         IdentifierLiteral => run(None, None, Presidence::PREC_NONE),
-        StringLiteral     => run(None, None, Presidence::PREC_NONE),
-        NumberLiteral     => run(Some(Compiler::number as ParseFn), None, Presidence::PREC_NONE),
+        StringLiteral => run(None, None, Presidence::PREC_NONE),
+        NumberLiteral => run(Some(Compiler::number), None, Presidence::PREC_NONE),
 
-        And               => run(None, None, Presidence::PREC_NONE),
-        Class             => run(None, None, Presidence::PREC_NONE),
-        Else              => run(None, None, Presidence::PREC_NONE),
-        False             => run(None, None, Presidence::PREC_NONE),
-        For               => run(None, None, Presidence::PREC_NONE),
-        Fun               => run(None, None, Presidence::PREC_NONE),
-        If                => run(None, None, Presidence::PREC_NONE),
-        Nil               => run(None, None, Presidence::PREC_NONE),
-        Or                => run(None, None, Presidence::PREC_NONE),
-        Print             => run(None, None, Presidence::PREC_NONE),
-        Return            => run(None, None, Presidence::PREC_NONE),
-        Super             => run(None, None, Presidence::PREC_NONE),
-        This              => run(None, None, Presidence::PREC_NONE),
-        True              => run(None, None, Presidence::PREC_NONE),
-        Var               => run(None, None, Presidence::PREC_NONE),
-        While             => run(None, None, Presidence::PREC_NONE),
-        Error             => run(None, None, Presidence::PREC_NONE),
-        Eof               => run(None, None, Presidence::PREC_NONE),    }
+        And => run(None, None, Presidence::PREC_NONE),
+        Class => run(None, None, Presidence::PREC_NONE),
+        Else => run(None, None, Presidence::PREC_NONE),
+        False => run(Some(Compiler::literal), None, Presidence::PREC_NONE),
+        For => run(None, None, Presidence::PREC_NONE),
+        Fun => run(None, None, Presidence::PREC_NONE),
+        If => run(None, None, Presidence::PREC_NONE),
+        Nil => run(Some(Compiler::literal), None, Presidence::PREC_NONE),
+        Or => run(None, None, Presidence::PREC_NONE),
+        Print => run(None, None, Presidence::PREC_NONE),
+        Return => run(None, None, Presidence::PREC_NONE),
+        Super => run(None, None, Presidence::PREC_NONE),
+        This => run(None, None, Presidence::PREC_NONE),
+        True => run(Some(Compiler::literal), None, Presidence::PREC_NONE),
+        Var => run(None, None, Presidence::PREC_NONE),
+        While => run(None, None, Presidence::PREC_NONE),
+        Error => run(None, None, Presidence::PREC_NONE),
+        Eof => run(None, None, Presidence::PREC_NONE),
+    }
 }
 
 fn run(prefix: Option<ParseFn>, infix: Option<ParseFn>, presidence: Presidence) -> ParseRule {
@@ -81,7 +103,7 @@ pub enum Precedence {
     Primary,
 }
 
-#[derive(Clone,PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, PartialOrd,Debug)]
 #[repr(usize)]
 pub enum Presidence {
     PREC_NONE,
@@ -116,8 +138,7 @@ impl Presidence {
     }
 }
 
-
-#[derive(Clone,Default)]
+#[derive(Clone, Default)]
 pub struct Parser {
     current: Token,
     previous: Token,
@@ -132,9 +153,21 @@ pub struct Compiler {
 }
 
 impl Compiler {
+    pub fn new(source: String) -> Self {
+        Self {
+            scanner: Scanner::new(source),
+            current: None,
+            parser: Parser::default(),
+        }
+    }
 
-    pub fn new(source:String)-> Self{
-        Self { scanner: Scanner::new(source), current: None,parser:Parser::default()}
+    pub fn literal(&mut self) {
+        match self.parser.previous.kind {
+            Kind::True => self.emitByte(OpCode::OP_TRUE as u8),
+            Kind::Nil => self.emitByte(OpCode::OP_NIL as u8),
+            Kind::False => self.emitByte(OpCode::OP_FALSE as u8),
+            _ => unreachable!(),
+        }
     }
     pub fn compile(&mut self, chunk: Rc<RefCell<Chunk>>) -> bool {
         self.current = Some(chunk);
@@ -155,21 +188,23 @@ impl Compiler {
 
     fn number(&mut self) {
         let val = self.parser.previous.string.parse::<f64>().unwrap();
-        self.emit_constant(val);
+        self.emit_constant(Value::from(val));
     }
 
-    fn emit_constant(&mut self, value: f64) {
+    fn emit_constant(&mut self, value: Value) {
         let byte = self.make_constnat(value);
         self.emit_Bytes(OpCode::Op_Constnats as u8, byte);
     }
 
-    fn make_constnat(&mut self, value: f64) -> u8 {
-        let constnat = self.current
+    fn make_constnat(&mut self, value: Value) -> u8 {
+        let constnat = self
+            .current
             .as_ref()
             .unwrap()
             .borrow_mut()
             .addConstant(value) as u8;
-        if constnat > u8::MAX {
+
+        if constnat >= u8::MAX {
             eprintln!("Too many constants");
             return 0;
         }
@@ -182,20 +217,17 @@ impl Compiler {
     }
 
     pub fn unary(&mut self) {
-        self.parsePrecedence(Presidence::PREC_ASSIGNMENT);
-        let operator_type = self.parser.previous.kind.clone();
-        self.expression();
 
+        let operator_type = self.parser.previous.kind.clone();
+        self.parsePrecedence(Presidence::PREC_UNARY);
         match operator_type {
             Kind::Minus => self.emitByte(OpCode::OP_NEGATE as u8),
+            Kind::Bang => self.emitByte(OpCode::OP_NOT as u8),
             _ => (),
         }
     }
 
-
-
-    pub fn binary(&mut self){
-
+    pub fn binary(&mut self) {
         let token_kind = self.parser.previous.kind.clone();
         let rule = rule_for_token(&token_kind);
         self.parsePrecedence(rule.precedence.next().unwrap());
@@ -203,28 +235,39 @@ impl Compiler {
         use Kind::*;
         match token_kind {
             Plus => self.emitByte(OpCode::OP_ADD as u8),
-            Minus => self.emitByte(OpCode::OP_NEGATE as u8),
+            Minus => self.emitByte(OpCode::OP_SUBTRACT as u8),
+            Bang => self.emitByte(OpCode::OP_NOT as u8),
             Star => self.emitByte(OpCode::OP_MULTIPLY as u8),
             Slash => self.emitByte(OpCode::OP_DIVIDE as u8),
-        _ => panic!("Unreachable: unexpected operator in binary()"),
+            EqualEqual => self.emitByte(OpCode::OP_EQUAL as u8),
+            BangEqual => self.emit_Bytes(OpCode::OP_EQUAL as u8, OpCode::OP_NOT as u8),
+            Greater => self.emitByte(OpCode::OP_GREATER as u8),
+            Less => self.emitByte(OpCode::OP_LESS as u8),
+            LessEqual => self.emit_Bytes(OpCode::OP_LESS as u8, OpCode::OP_NOT as u8),
+            GreaterEqual => self.emit_Bytes(OpCode::OP_GREATER as u8, OpCode::OP_NOT as u8),
+            LessEqual => self.emit_Bytes(OpCode::OP_LESS as u8, OpCode::OP_NOT as u8),
+            a => panic!("Unreachable: unexpected operator in binary({:?})",a),
         }
     }
 
-    fn parsePrecedence(&mut self, preseidence: Presidence) {
+  
+fn parsePrecedence(&mut self, precedence: Presidence) {
+    self.advance();
+
+    let prefix = rule_for_token(&self.parser.previous.kind).prefix;
+    if prefix == None {
+        println!("Expected expression {:?}", self.parser.previous.kind);
+        return;
+    }
+    prefix.unwrap()(self);
+
+    while precedence <= rule_for_token(&self.parser.current.kind).precedence {
+       // println!("While loop: {:?} <= {:?}", precedence, rule_for_token(&self.parser.current.kind).precedence);
         self.advance();
-        let fun = rule_for_token(&self.parser.previous.kind).prefix;
-        if fun == None{
-            eprint!("Expected Expreession");
-            return;
-        }
-        fun.unwrap()(self);
-
-        while preseidence <= rule_for_token(&self.parser.current.kind).precedence{
-            self.advance();
-            let infix = rule_for_token(&self.parser.previous.kind).infix.unwrap();
-            infix(self)
-        }
+        let infix = rule_for_token(&self.parser.previous.kind).infix.unwrap();
+        infix(self);
     }
+}
 
     fn emit_Bytes(&mut self, byte_1: u8, byte_2: u8) {
         self.emitByte(byte_1);
@@ -234,7 +277,11 @@ impl Compiler {
     fn endCompiler(&mut self) {
         self.emit_return();
         if !self.parser.has_error {
-           self.current.as_ref().unwrap().borrow_mut().disassembleChunk("code");
+            self.current
+                .as_ref()
+                .unwrap()
+                .borrow_mut()
+                .disassembleChunk("code");
         }
     }
     fn emit_return(&mut self) {
@@ -248,6 +295,7 @@ impl Compiler {
             .write_chunk(byte, self.parser.previous.line);
     }
     pub fn consume(&mut self, token: Kind, message: String) {
+
         if self.parser.current.kind == token {
             self.advance();
             return;
@@ -272,20 +320,22 @@ impl Compiler {
         self.errorAt(data);
     }
 
-    fn errorAt(&mut self, data: &String) {
-        let token = &self.parser.current;
-        self.parser.panic_mode = true;
-        eprintln!("[Line {}] Error", token.line);
+   
+fn errorAt(&mut self, data: &String) {
+    let token = &self.parser.current;
 
-        if self.parser.panic_mode {
-            return;
-        }
-        if token.kind == Kind::Eof {
-            eprintln!("at end");
-        } else if token.kind == Kind::Error {
-        } else {
-            eprintln!("at {} {}", token.index_in_source, token.string);
-        }
-        self.parser.has_error = true;
+    // Don't bail out before printing!
+    eprintln!("[Line {}] Error", token.line);
+
+    if token.kind == Kind::Eof {
+        eprintln!(" at end: {}", data);
+    } else if token.kind == Kind::Error {
+        eprintln!(" error: {}", data);
+    } else {
+        eprintln!(" at '{}': {}", token.string, data);
     }
+
+    self.parser.panic_mode = true;
+    self.parser.has_error = true;
+}
 }
