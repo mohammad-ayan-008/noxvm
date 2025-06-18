@@ -59,7 +59,7 @@ fn rule_for_token(token: &Kind) -> ParseRule {
         Greater => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
         GreaterEqual => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
         Less => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
-        LessEqual => run(Some(Compiler::binary), None, Presidence::PREC_COMPARISON),
+        LessEqual => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
 
         IdentifierLiteral => run(None, None, Presidence::PREC_NONE),
         StringLiteral => run(None, None, Presidence::PREC_NONE),

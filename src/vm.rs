@@ -161,6 +161,12 @@ impl VM {
                 self.stack.push_back(Value::from(ValueType::VAL_BOOL(val1.as_number() < val2.as_number())));
             }
             OpCode::OP_LESS => {
+                let val1 = self.stack.pop_back().unwrap();
+                let val2 = self.stack.pop_back().unwrap();
+                if !val1.is_number() || !val2.is_number() {
+                    self.runtime_Error("LHS != RHS");
+                }
+                self.stack.push_back(Value::from(ValueType::VAL_BOOL(val1.as_number() > val2.as_number())));
 
             }
             a => panic!("Unable to parse the Binary operation"),
