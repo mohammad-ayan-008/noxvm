@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[derive(Debug, PartialEq, Clone, Default)]
 pub enum Kind {
     LeftBrace,
@@ -52,5 +54,5 @@ pub struct Token {
     pub kind: Kind,
     pub line: usize,
     pub index_in_source: usize,
-    pub string: String,
+    pub string: Rc<String>,
 }

@@ -1,11 +1,11 @@
 #![allow(warnings)]
-use std::{cell::RefCell, default, panic, rc::Rc, slice::SliceIndex, usize};
+use std::{cell::RefCell, default, env::set_var, panic, rc::Rc, slice::SliceIndex, usize};
 
 use crate::{
     chunk::{Chunk, OpCode},
     scanner::{self, Scanner},
     token::{Kind, Token},
-    value::Value,
+    value::{Value, ValueType},
 };
 
 type ParseFn = for<'a> fn(&'a mut Compiler);
@@ -62,7 +62,7 @@ fn rule_for_token(token: &Kind) -> ParseRule {
         LessEqual => run(None, Some(Compiler::binary), Presidence::PREC_COMPARISON),
 
         IdentifierLiteral => run(None, None, Presidence::PREC_NONE),
-        StringLiteral => run(None, None, Presidence::PREC_NONE),
+        StringLiteral => run(Some(Compiler::string), None, Presidence::PREC_NONE),
         NumberLiteral => run(Some(Compiler::number), None, Presidence::PREC_NONE),
 
         And => run(None, None, Presidence::PREC_NONE),
@@ -103,7 +103,7 @@ pub enum Precedence {
     Primary,
 }
 
-#[derive(Clone, PartialEq, PartialOrd,Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 #[repr(usize)]
 pub enum Presidence {
     PREC_NONE,
@@ -161,6 +161,11 @@ impl Compiler {
         }
     }
 
+    pub fn string(&mut self) {
+        let str = self.parser.previous.string.clone();
+        self.emit_constant(Value::from(ValueType::VAL_STRING(str)));
+    }
+
     pub fn literal(&mut self) {
         match self.parser.previous.kind {
             Kind::True => self.emitByte(OpCode::OP_TRUE as u8),
@@ -175,11 +180,33 @@ impl Compiler {
         self.parser.has_error = false;
         self.advance();
 
-        self.expression();
+        while !self.match_token(Kind::Eof) {
+            self.declaration();
+            if self.parser.panic_mode {
+                break; // or synchronize if you want to recover
+            }
+        }
 
         self.consume(Kind::Eof, "Expected End of expression".to_owned());
         self.endCompiler();
         !self.parser.has_error
+    }
+
+    fn declaration(&mut self) {
+        self.statement();
+    }
+    fn statement(&mut self) {
+        if self.match_token(Kind::Print) {
+            self.printStatement();
+        }
+    }
+
+    fn printStatement(&mut self) {
+        self.consume(Kind::LeftParen, "Expected ( before Expression ".to_string());
+        self.expression();
+        self.consume(Kind::RightParen, "Expected ( after Expression ".to_string());
+        self.consume(Kind::Semicolon, "Expected ; after Expression ".to_string());
+        self.emitByte(OpCode::OP_PRINT as u8);
     }
 
     fn expression(&mut self) {
@@ -187,6 +214,7 @@ impl Compiler {
     }
 
     fn number(&mut self) {
+        //println!("{}",self.parser.previous.string);
         let val = self.parser.previous.string.parse::<f64>().unwrap();
         self.emit_constant(Value::from(val));
     }
@@ -194,6 +222,17 @@ impl Compiler {
     fn emit_constant(&mut self, value: Value) {
         let byte = self.make_constnat(value);
         self.emit_Bytes(OpCode::Op_Constnats as u8, byte);
+    }
+
+    fn match_token(&mut self, token: Kind) -> bool {
+        if !self.check(token) {
+            return false;
+        };
+        self.advance();
+        return true;
+    }
+    fn check(&self, token: Kind) -> bool {
+        self.parser.current.kind == token
     }
 
     fn make_constnat(&mut self, value: Value) -> u8 {
@@ -204,7 +243,7 @@ impl Compiler {
             .borrow_mut()
             .addConstant(value) as u8;
 
-        if constnat >= u8::MAX {
+        if constnat > u8::MAX {
             eprintln!("Too many constants");
             return 0;
         }
@@ -217,7 +256,6 @@ impl Compiler {
     }
 
     pub fn unary(&mut self) {
-
         let operator_type = self.parser.previous.kind.clone();
         self.parsePrecedence(Presidence::PREC_UNARY);
         match operator_type {
@@ -246,28 +284,27 @@ impl Compiler {
             LessEqual => self.emit_Bytes(OpCode::OP_LESS as u8, OpCode::OP_NOT as u8),
             GreaterEqual => self.emit_Bytes(OpCode::OP_GREATER as u8, OpCode::OP_NOT as u8),
             LessEqual => self.emit_Bytes(OpCode::OP_LESS as u8, OpCode::OP_NOT as u8),
-            a => panic!("Unreachable: unexpected operator in binary({:?})",a),
+            a => panic!("Unreachable: unexpected operator in binary({:?})", a),
         }
     }
 
-  
-fn parsePrecedence(&mut self, precedence: Presidence) {
-    self.advance();
-
-    let prefix = rule_for_token(&self.parser.previous.kind).prefix;
-    if prefix == None {
-        println!("Expected expression {:?}", self.parser.previous.kind);
-        return;
-    }
-    prefix.unwrap()(self);
-
-    while precedence <= rule_for_token(&self.parser.current.kind).precedence {
-       // println!("While loop: {:?} <= {:?}", precedence, rule_for_token(&self.parser.current.kind).precedence);
+    fn parsePrecedence(&mut self, precedence: Presidence) {
         self.advance();
-        let infix = rule_for_token(&self.parser.previous.kind).infix.unwrap();
-        infix(self);
+
+        let prefix = rule_for_token(&self.parser.previous.kind).prefix;
+        if prefix == None {
+            println!("Expected expression {:?}", self.parser.previous.kind);
+            return;
+        }
+        prefix.unwrap()(self);
+
+        while precedence <= rule_for_token(&self.parser.current.kind).precedence {
+            // println!("While loop: {:?} <= {:?}", precedence, rule_for_token(&self.parser.current.kind).precedence);
+            self.advance();
+            let infix = rule_for_token(&self.parser.previous.kind).infix.unwrap();
+            infix(self);
+        }
     }
-}
 
     fn emit_Bytes(&mut self, byte_1: u8, byte_2: u8) {
         self.emitByte(byte_1);
@@ -295,7 +332,6 @@ fn parsePrecedence(&mut self, precedence: Presidence) {
             .write_chunk(byte, self.parser.previous.line);
     }
     pub fn consume(&mut self, token: Kind, message: String) {
-
         if self.parser.current.kind == token {
             self.advance();
             return;
@@ -320,22 +356,21 @@ fn parsePrecedence(&mut self, precedence: Presidence) {
         self.errorAt(data);
     }
 
-   
-fn errorAt(&mut self, data: &String) {
-    let token = &self.parser.current;
+    fn errorAt(&mut self, data: &String) {
+        let token = &self.parser.current;
 
-    // Don't bail out before printing!
-    eprintln!("[Line {}] Error", token.line);
+        // Don't bail out before printing!
+        eprintln!("[Line {}] Error", token.line);
 
-    if token.kind == Kind::Eof {
-        eprintln!(" at end: {}", data);
-    } else if token.kind == Kind::Error {
-        eprintln!(" error: {}", data);
-    } else {
-        eprintln!(" at '{}': {}", token.string, data);
+        if token.kind == Kind::Eof {
+            eprintln!(" at end: {}", data);
+        } else if token.kind == Kind::Error {
+            eprintln!(" error: {}", data);
+        } else {
+            eprintln!(" at '{}': {}", token.string, data);
+        }
+
+        self.parser.panic_mode = true;
+        self.parser.has_error = true;
     }
-
-    self.parser.panic_mode = true;
-    self.parser.has_error = true;
-}
 }

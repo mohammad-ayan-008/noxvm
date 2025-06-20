@@ -20,6 +20,7 @@ pub enum OpCode {
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
+    OP_PRINT,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -122,29 +123,34 @@ impl Chunk {
             OpCode::OP_NOT => {
                 println!("OP_NOT");
                 offset + 1
-            },
-            OpCode::OP_LESS =>{
+            }
+            OpCode::OP_LESS => {
                 println!("OP_LESS");
                 offset + 1
-            },
-            OpCode::OP_GREATER =>{
+            }
+            OpCode::OP_GREATER => {
                 println!("OP_GREATER");
                 offset + 1
-            },
-            OpCode::OP_EQUAL =>{
+            }
+            OpCode::OP_EQUAL => {
                 println!("OP_EQUAL");
                 offset + 1
-            },
+            }
+            OpCode::OP_PRINT => {
+                println!("OP_PRINT");
+                offset + 1
+            }
 
             _ => todo!(),
         }
     }
 
-    fn printValue(&self, value: &Value) {
+    pub fn printValue(&self, value: &Value) {
         match value.type_v {
             value::ValueType::VAL_NIL => println!("nil"),
             value::ValueType::VAL_BOOL(a) => println!("{}", a),
             value::ValueType::VAL_NUMBER(a) => println!("{}", a),
+            value::ValueType::VAL_STRING(ref a) => println!("{}", a.as_str()),
         }
     }
 }

@@ -1,10 +1,15 @@
-use std::ops::{Add, Mul, Neg, Sub};
+use std::{
+    ops::{Add, Mul, Neg, Sub},
+    panic,
+    rc::Rc,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueType {
     VAL_BOOL(bool),
     VAL_NIL,
     VAL_NUMBER(f64),
+    VAL_STRING(Rc<String>),
 }
 /*
 impl Clone for Value{
@@ -29,7 +34,6 @@ impl From<f64> for Value {
     }
 }
 
-
 impl From<ValueType> for Value {
     fn from(value: ValueType) -> Self {
         Self { type_v: value }
@@ -37,7 +41,6 @@ impl From<ValueType> for Value {
 }
 
 impl Value {
-    
     pub fn bool_value(value: bool) -> Self {
         Self::from(ValueType::VAL_BOOL(value))
     }
@@ -46,6 +49,9 @@ impl Value {
     }
     pub fn number_value(value: f64) -> Self {
         Self::from(ValueType::VAL_NUMBER(value))
+    }
+    pub fn obj_value(str: &str) -> Self {
+        Self::from(ValueType::VAL_STRING(Rc::new(str.to_string())))
     }
 
     pub fn as_bool(&self) -> bool {
@@ -64,8 +70,18 @@ impl Value {
         }
     }
 
+    pub fn as_obj(&self) -> Rc<String> {
+        if let ValueType::VAL_STRING(str) = self.type_v.clone() {
+            str.clone()
+        } else {
+            panic!("Tried to extract object from non obj value");
+        }
+    }
     pub fn is_bool(&self) -> bool {
         matches!(self.type_v, ValueType::VAL_BOOL(_))
+    }
+    pub fn is_obj(&self) -> bool {
+        matches!(self.type_v, ValueType::VAL_STRING(_))
     }
 
     pub fn is_number(&self) -> bool {
@@ -113,6 +129,9 @@ impl Add for Value {
     fn add(self, rhs: Self) -> Self::Output {
         match (self.type_v, rhs.type_v) {
             (ValueType::VAL_NUMBER(n), ValueType::VAL_NUMBER(n2)) => Value::from(n + n2),
+            (ValueType::VAL_STRING(a), ValueType::VAL_STRING(b)) => Value::from(
+                ValueType::VAL_STRING(Rc::new(format!("{}{}", a.as_str(), b.as_str()))),
+            ),
             a => panic!("{:?}+{:?} is not valid", a.0, a.1),
         }
     }

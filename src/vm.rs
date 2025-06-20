@@ -1,9 +1,17 @@
-use std::{cell::RefCell, collections::VecDeque, env::set_var, mem::offset_of, rc::Rc, usize, vec};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    env::set_var,
+    hash::Hash,
+    mem::offset_of,
+    rc::Rc,
+    usize, vec,
+};
 
 use crate::{
     chunk::{Chunk, OpCode},
     compiler::Compiler,
-    value::{Value, ValueType},
+    value::{self, Value, ValueType},
 };
 
 pub struct VM {
@@ -11,6 +19,7 @@ pub struct VM {
     pub ip: usize,
     pub stack: VecDeque<Value>,
     compiler: Compiler,
+    table: HashMap<String, Value>,
 }
 pub enum InterpretResult {
     INTERPRET_OK,
@@ -26,6 +35,7 @@ impl VM {
             ip: 0,
             stack: VecDeque::with_capacity(256),
             compiler: Compiler::new(source),
+            table: HashMap::new(),
         }
     }
 
@@ -40,21 +50,22 @@ impl VM {
     pub fn run(&mut self) -> Option<InterpretResult> {
         loop {
             //print!("          ");
-           // println!(" stack {:?}", self.stack);
-            self.chunk
-                .as_ref()
-                .unwrap()
-                .borrow_mut()
-                .disassembleInstruction(self.ip);
+            // println!(" stack {:?}", self.stack);
+            // self.chunk
+            //   .as_ref()
+            // .unwrap()
+            //.borrow_mut()
+            //.disassembleInstruction(self.ip);
             let instruction = self.read_byte();
             match OpCode::try_from(instruction).unwrap() {
                 OpCode::Return => {
-                    let val = self.stack.pop_back().unwrap();
-                    match val.type_v  {
-                        ValueType::VAL_NUMBER(a)=>println!("{}",a),
-                        ValueType::VAL_BOOL(a)=>println!("{}",a),
-                        ValueType::VAL_NIL=>println!("nil")
-                    }
+                    // let val = self.stack.pop_back().unwrap();
+                    //match val.type_v  {
+                    //  ValueType::VAL_NUMBER(a)=>println!("{}",a),
+                    // ValueType::VAL_BOOL(a)=>println!("{}",a),
+                    //ValueType::VAL_NIL=>println!("nil"),
+                    //ValueType::VAL_STRING(a)=>println!("{}",a)
+                    //}
                     return Some(InterpretResult::INTERPRET_OK);
                 }
                 OpCode::OP_NIL => self.stack.push_back(Value::nil_value()),
@@ -64,9 +75,12 @@ impl VM {
                 OpCode::OP_TRUE => self.stack.push_back(Value::from(ValueType::VAL_BOOL(true))),
                 OpCode::Op_Constnats => {
                     let value = self.read_constant();
-                    if let ValueType::VAL_NUMBER(value) = value.type_v {
+                    if let ValueType::VAL_NUMBER(_) = value.type_v {
+                        //println!("{:>4?}", value);
                         self.stack.push_back(Value::from(value));
-                        println!("{:>4?}", value);
+                    } else if let ValueType::VAL_STRING(_) = value.type_v {
+                        //println!("{:?}", value);
+                        self.stack.push_back(Value::from(value));
                     }
                 }
                 OpCode::OP_NEGATE => {
@@ -97,10 +111,18 @@ impl VM {
 
                 a @ OpCode::OP_GREATER => self.binar_op(a),
                 a @ OpCode::OP_LESS => self.binar_op(a),
+                OpCode::OP_PRINT => {
+                    self.chunk
+                        .as_ref()
+                        .unwrap()
+                        .borrow_mut()
+                        .printValue(&self.stack.pop_back().unwrap());
+                }
                 _ => todo!(),
             }
         }
     }
+
     fn valueEqual(val1: Value, val2: Value) -> bool {
         if val1.type_v != val2.type_v {
             return false;
@@ -109,6 +131,7 @@ impl VM {
             ValueType::VAL_BOOL(_) => val1.as_bool() == val2.as_bool(),
             ValueType::VAL_NIL => true,
             ValueType::VAL_NUMBER(_) => val1.as_number() == val2.as_number(),
+            ValueType::VAL_STRING(_) => val1.as_obj().as_str() == val2.as_obj().as_str(),
         }
     }
 
@@ -158,7 +181,9 @@ impl VM {
                 if !val1.is_number() || !val2.is_number() {
                     self.runtime_Error("LHS != RHS");
                 }
-                self.stack.push_back(Value::from(ValueType::VAL_BOOL(val1.as_number() < val2.as_number())));
+                self.stack.push_back(Value::from(ValueType::VAL_BOOL(
+                    val1.as_number() < val2.as_number(),
+                )));
             }
             OpCode::OP_LESS => {
                 let val1 = self.stack.pop_back().unwrap();
@@ -166,8 +191,9 @@ impl VM {
                 if !val1.is_number() || !val2.is_number() {
                     self.runtime_Error("LHS != RHS");
                 }
-                self.stack.push_back(Value::from(ValueType::VAL_BOOL(val1.as_number() > val2.as_number())));
-
+                self.stack.push_back(Value::from(ValueType::VAL_BOOL(
+                    val1.as_number() > val2.as_number(),
+                )));
             }
             a => panic!("Unable to parse the Binary operation"),
         }

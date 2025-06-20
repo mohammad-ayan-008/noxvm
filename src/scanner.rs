@@ -1,5 +1,5 @@
 use crate::token::{Kind, Token};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 pub struct Scanner {
     characters: VecDeque<char>,
     line: usize,
@@ -136,18 +136,18 @@ impl Scanner {
             kind,
             line: self.line,
             index_in_source: self.index,
-            string: self.read_front(count),
+            string: Rc::new(self.read_front(count)),
         }
     }
 
     fn read_front(&mut self, count: usize) -> String {
         let mut string = String::new();
-        for _ in 0..count {
+        for i in 0..count {
             if let Some(ch) = self.advance() {
                 string.push(ch);
             }
         }
-        string
+        string.replace("\"", "")
     }
     pub fn advance(&mut self) -> Option<char> {
         self.index += 1;
@@ -282,7 +282,7 @@ mod tests {
         let token = scanner.next();
 
         assert_eq!(token.kind, expected_kind);
-        assert_eq!(token.string, source);
+        assert_eq!(token.string, source.into());
         assert_eq!(scanner.next().kind, Kind::Eof, "Expected Eof.");
     }
 }
